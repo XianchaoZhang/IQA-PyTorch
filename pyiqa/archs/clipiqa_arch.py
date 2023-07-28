@@ -43,7 +43,15 @@ class PromptLearner(nn.Module):
 
         # For the following codes about prompts, we follow the official codes to get the same results
         prompt_prefix = " ".join(["X"] * n_ctx) + ' '
-        init_prompts = [prompt_prefix + 'Good photo..', prompt_prefix + 'Bad photo..']
+        init_prompts = [prompt_prefix + 'Good photo..', prompt_prefix + 'Bad photo..',
+                        prompt_prefix + 'Bright photo', prompt_prefix + 'Dark photo',
+                        prompt_prefix + 'High contrast image..', prompt_prefix + 'Low contrast photo..',
+                        prompt_prefix + 'Sharp photo..', prompt_prefix + 'blurry photo..',
+                        prompt_prefix + 'sharp edges..', prompt_prefix + 'blurry edges..',
+                        prompt_prefix + 'High resolution photo..', prompt_prefix + 'low resolution photo..',
+                        prompt_prefix + 'Noise-free photo..', prompt_prefix + 'noisy photo..']
+        #print(f"prompt: {init_prompts}")
+        #exit(0)
         with torch.no_grad():
             txt_token = clip.tokenize(init_prompts)
             self.tokenized_prompts = txt_token
@@ -55,7 +63,14 @@ class PromptLearner(nn.Module):
         self.n_ctx = n_ctx
 
         self.n_cls = len(init_prompts)
-        self.name_lens = [3, 3]  # hard coded length, which does not include the extra "." at the end
+        self.name_lens = [3, 3,
+                          3, 3,
+                          3, 3,
+                          3, 3,
+                          3, 3,
+                          3, 3,
+                          3, 3,
+                          ]  # hard coded length, which does not include the extra "." at the end
 
         self.register_buffer("token_prefix", init_embedding[:, :1, :])  # SOS
         self.register_buffer("token_suffix", init_embedding[:, 1 + n_ctx:, :])  # CLS, EOS
@@ -87,6 +102,7 @@ class PromptLearner(nn.Module):
             )
             prompts.append(prompt)
         prompts = torch.cat(prompts, dim=0)
+        #print(f"learn prompts: {prompts}")
         return prompts
 
     def forward(self, clip_model):
@@ -101,6 +117,7 @@ class PromptLearner(nn.Module):
         # x.shape = [batch_size, n_ctx, transformer.width]
         # take features from the eot embedding (eot_token is the highest number in each sequence)
         x = x[torch.arange(x.shape[0]), self.tokenized_prompts.argmax(dim=-1)] @ clip_model.text_projection
+        #print(f"learn prompt x: {x}")
 
         return x
 
@@ -119,6 +136,8 @@ class CLIPIQA(nn.Module):
         # Different from original paper, we assemble multiple prompts to improve performance
         self.prompt_pairs = clip.tokenize([
             'Good image', 'bad image',
+            'Bright image', 'Dark image',
+            'High contrast image', 'Low contrast image',
             'Sharp image', 'blurry image',
             'sharp edges', 'blurry edges',
             'High resolution image', 'low resolution image',
@@ -158,5 +177,6 @@ class CLIPIQA(nn.Module):
                 x, None, text_features=learned_prompt_feature, pos_embedding=self.pos_embedding)
 
         probs = logits_per_image.reshape(logits_per_image.shape[0], -1, 2).softmax(dim=-1)
+        #print(f"probs: {probs}")
 
-        return probs[..., 0].mean(dim=1, keepdim=True)
+        return probs[..., 0] #.mean(dim=1, keepdim=True)
