@@ -33,7 +33,7 @@ def main():
         #print(f"input_paths: {input_paths}")
         #exit(0)
 
-    attrs = ['Quality', 'Brightness', 'Contrast', 'Sharpness', 'SharpEdge', 'Resolution', 'Noiseness']
+    attrs = ['Quality', 'Brightness', 'Sharpness', 'Noisiness', 'Colorfulness', 'Contrast', 'Aesthetic', 'Happy', 'Natural', 'Scary', 'Complex']
     attr_rows = []
     fp_rows = []
     fn_row = []
@@ -53,9 +53,36 @@ def main():
         #pbar.write(f'{metric_name} of {fn}: {score}')
 
     pbar.close()
-    #print(f"fp_rows: {fp_rows}")
+    #print(f"{__name__} attrs: {attrs}\nattr_rows: {attr_rows}")
     out_df = pd.DataFrame(attr_rows, columns=attrs, index=fn_row)
     out_df.to_csv("iqa.csv")
+    if 0:
+        import plotly.graph_objects as go
+
+        fig = go.Figure()
+        for i, fn in zip(attr_rows, fn_row):
+            fig.add_trace(
+                go.Scatterpolar(
+                    r=list(i),
+                    theta=attrs,
+                    fill='toself',
+                    name = fn
+                )
+            )
+        fig.update_layout(
+            polar=dict(
+                radialaxis=dict(
+                    visible=True,
+                    range=[0, 100]
+                )
+            ),
+            showlegend=False
+        )
+        fig.show()
+        exit(0)
+        fig.update_xaxes(tickfont_family="Arial Black")
+        fig.write_image('./test.svg', engine="kaleido")
+
     print(f'Done!')
 
 if __name__ == '__main__':

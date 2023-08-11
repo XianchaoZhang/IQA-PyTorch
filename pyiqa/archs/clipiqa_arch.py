@@ -44,12 +44,16 @@ class PromptLearner(nn.Module):
         # For the following codes about prompts, we follow the official codes to get the same results
         prompt_prefix = " ".join(["X"] * n_ctx) + ' '
         init_prompts = [prompt_prefix + 'Good photo..', prompt_prefix + 'Bad photo..',
-                        prompt_prefix + 'Bright photo', prompt_prefix + 'Dark photo',
-                        prompt_prefix + 'High contrast image..', prompt_prefix + 'Low contrast photo..',
+                        prompt_prefix + 'Bright photo..', prompt_prefix + 'Dark photo..',
                         prompt_prefix + 'Sharp photo..', prompt_prefix + 'blurry photo..',
-                        prompt_prefix + 'sharp edges..', prompt_prefix + 'blurry edges..',
-                        prompt_prefix + 'High resolution photo..', prompt_prefix + 'low resolution photo..',
-                        prompt_prefix + 'Noise-free photo..', prompt_prefix + 'noisy photo..']
+                        prompt_prefix + 'Noisy photo..', prompt_prefix + 'Clean photo..',
+                        prompt_prefix + 'Colorful photo..', prompt_prefix + 'Dull photo..',
+						prompt_prefix + 'High contrast photo..', prompt_prefix + 'Low contrast photo..',
+						prompt_prefix + 'Aesthetic photo..', prompt_prefix + 'Not aesthetic photo..',
+                        prompt_prefix + 'Happy photo..', prompt_prefix + 'Sad photo..',
+						prompt_prefix + 'Natural photo..', prompt_prefix + 'Synthetic photo..',
+                        prompt_prefix + 'Scary photo..', prompt_prefix + 'Peaceful photo..',
+                        prompt_prefix + 'Complex photo..', prompt_prefix + 'Simple photo..']
         #print(f"prompt: {init_prompts}")
         #exit(0)
         with torch.no_grad():
@@ -64,6 +68,10 @@ class PromptLearner(nn.Module):
 
         self.n_cls = len(init_prompts)
         self.name_lens = [3, 3,
+                          3, 3,
+                          3, 3,
+                          3, 3,
+                          3, 3,
                           3, 3,
                           3, 3,
                           3, 3,
@@ -133,16 +141,22 @@ class CLIPIQA(nn.Module):
         super().__init__()
 
         self.clip_model = [load(backbone, 'cpu')]  # avoid saving clip weights
+        #print(f"{__name__} clip_model: {type(self.clip_model[0])}")
         # Different from original paper, we assemble multiple prompts to improve performance
         self.prompt_pairs = clip.tokenize([
-            'Good image', 'bad image',
-            'Bright image', 'Dark image',
-            'High contrast image', 'Low contrast image',
-            'Sharp image', 'blurry image',
-            'sharp edges', 'blurry edges',
-            'High resolution image', 'low resolution image',
-            'Noise-free image', 'noisy image',
+            'Good photo.', 'Bad photo.',
+            'Bright photo.', 'Dark photo.',
+            'Sharp photo.', 'Blurry photo.',
+            'Noisy photo.', 'Clean photo.',
+            'Colorful photo.', 'Dull photo.',
+            'High contrast photo.', 'Low contrast photo.',
+            'Aesthetic photo.', 'Not aesthetic photo.',
+            'Happy photo.', 'Sad photo.',
+            'Natural photo.', 'Synthetic photo.',
+            'Scary photo.', 'Peaceful photo.',
+            'Complex photo.', 'Simple photo.',
         ])
+        #print(f"{__name__} prompt_pair shape: {self.prompt_pairs.shape}")
 
         self.model_type = model_type
         self.pos_embedding = pos_embedding
@@ -165,8 +179,10 @@ class CLIPIQA(nn.Module):
     
     def forward(self, x):
         # preprocess image
+        #print(f"{__name__} shape: {x.shape}")
         x = (x - self.default_mean.to(x)) / self.default_std.to(x)
         clip_model = self.clip_model[0].to(x)
+        #print(f"{__name__} clip_model: {type(clip_model)}")
 
         if self.model_type == 'clipiqa':
             prompts = self.prompt_pairs.to(x.device)
