@@ -1,0 +1,169 @@
+<!--
+# Dataset Preparation
+ -->
+# 数据集准备
+
+<!--
+- [Dataset Preparation](#dataset-preparation)
+  - [Supported Datasets](#supported-datasets)
+  - [Resources](#resources)
+  - [Interface of Dataloader](#interface-of-dataloader)
+  - [Specific Datasets and Dataloader](#specific-datasets-and-dataloader)
+  - [Test Dataloader](#test-dataloader)
+ -->
+- [数据集准备](#dataset-preparation)
+  - [支持的数据集](#supported-datasets)
+  - [资源](#resources)
+  - [Dataloader 接口](#interface-of-dataloader)
+  - [特定数据集和数据加载器](#special-datasets-and-dataloader)
+  - [测试数据加载器](#test-dataloader)
+
+<!--
+## Supported Datasets
+ -->
+## 支持的数据集
+
+| FR Dataset | Description | NR Dataset       | Description        |
+| ---------- | ----------- | ---------------- | ------------------ |
+| PIPAL      | *2AFC*      | FLIVE(PaQ-2-PiQ) | *Tech & Aesthetic* |
+| BAPPS      | *2AFC*      | SPAQ             | *Mobile*           |
+| PieAPP     | *2AFC*      | AVA              | *Aesthetic*        |
+| KADID-10k  |             | KonIQ-10k(++)    |                    |
+| LIVEM      |             | LIVEChallange    |                    |
+| LIVE       |             |                  |                    |
+| TID2013    |             |                  |                    |
+| TID2008    |             |                  |                    |
+| CSIQ       |             |                  |                    |
+
+<!--
+## Resources
+ -->
+## 资源
+
+<!--
+Here are some other resources to download the dataset:
+- [**Waterloo Bayesian IQA project**](http://ivc.uwaterloo.ca/research/bayesianIQA/). [ [IQA-Dataset](https://github.com/icbcbicc/IQA-Dataset) | [download links](http://ivc.uwaterloo.ca/database/IQADataset) ]
+ -->
+以下是下载数据集的一些其他资源：
+- [**滑铁卢贝叶斯 IQA 项目**](http://ivc.uwaterloo.ca/research/bayesianIQA/)。 [ [IQA-数据集](https://github.com/icbcbicc/IQA-Dataset) | [下载链接](http://ivc.uwaterloo.ca/database/IQADataset) ]
+
+<!--
+## Interface of Dataloader
+ -->
+## Dataloader 接口
+
+<!--
+We create general interfaces for FR and NR datasets in `pyiqa/data/general_fr_dataset.py` and `pyiqa/data/general_nr_dataset.py`. The main arguments are
+ -->
+我们在 `pyiqa/data/general_fr_dataset.py` 和 `pyiqa/data/general_nr_dataset.py` 中为 FR 和 NR 数据集创建通用接口。主要参数是
+
+<!--
+- `opt` contains all dataset options, including
+    - `dataroot_target`: path of target image folder.
+    - `dataroot_ref [optional]`: path of reference image folder.
+    - `meta_info_file`: file containing meta information of images, including relative image paths, mos labels and other labels.
+    - `augment [optional]` data augmentation transform list FIXME
+        - `hflip`: flip input images or pairs
+        - `random_crop`: int or tuple, random crop input images or pairs
+    - `split_file [optional]`: `train/val/test` split file `*.pkl`. If not specified, will load the whole dataset.
+    - `split_index [optional]`: default `1`, which split to use, only valid when `split_file` is specified.
+    - `dmos max`: some dataset use difference of mos. Set this to non-zero will change dmos to mos with `mos = dmos_max - dmos`.
+    - `phase`: phase labels [train, val, test]
+ -->
+- `opt` 包含所有数据集配置，包括
+    - `dataroot_target`：目标图像文件夹的路径。
+    - `dataroot_ref [可选]`：参考图像文件夹的路径。
+    - `meta_info_file`：包含图像元信息的文件，包括相对图像路径、mos 标签和其他标签。
+    - `augment [可选]`数据增强转换列表
+        - `hflip`：翻转输入图像或图像对
+        - `random_crop`：int 或 tuple，随机裁剪输入图像或图像对
+    - `split_file [可选]`：`train/val/test` 分割文件 `*.pkl`。如果未指定，将加载整个数据集。
+    - `split_index [可选]`：默认 `1`，使用哪个分割，仅在指定 `split_file` 时有效。
+    - `dmos max`：一些数据集使用 mos 的差异。将其设置为非零会将 dmos 更改为 mos，其中 `mos = dmos_max - dmos`。
+    - `phase`：阶段标签 [train、val、test]
+
+<!--
+The above interface requires two files to provide the dataset information, i.e., the `meta_info_file` and `split_file`. The `meta_info_file` are `.csv` files, and has the following general format
+ -->
+上述接口需要两个文件来提供数据集信息，即 `meta_info_file` 和 `split_file`。 `meta_info_file` 是 `.csv` 文件，具有以下通用格式
+
+```
+- For NR datasets: name, mos(mean), std
+    ```
+    100.bmp   	32.56107532210109   	19.12472638223644
+    ```
+
+- For FR datasets: ref_name, dist_name, mos(mean), std
+    ```
+    I01.bmp        I01_01_1.bmp   5.51429        0.13013
+    ```
+```
+
+<!--
+The `split_file` are `.pkl` files which contains the `train/val/test` information with python dictionary in the following format:
+ -->
+ `split_file` 是 `.pkl` 文件，其中包含 `train/val/test` 信息以及 python 字典，格式如下：
+
+```
+{
+    train_index: {
+        train: [train_index_list]
+        val: [val_index_list] # blank if no validation split
+        test: [test_index_list] # blank if no test split
+    }
+}
+```
+
+<!--
+The train_index starts from `1`. And the sample indexes correspond to the row index of `meta_info_file`, starting from `0`. We already generate the files for mainstream public datasets with scripts in folder [./scripts/](./scripts/).
+ -->
+
+train_index 从 `1` 开始。样本索引对应 `meta_info_file` 的行索引，从 `0` 开始。我们已经为主流公共数据集生成了文件，其中的脚本位于文件夹 [./scripts/](./scripts/) 中。
+
+<!--
+Note that we generate `train/val/test` splits follow the principles below:
+ -->
+请注意，我们生成 `train/val/test` 分割遵循以下原则：
+
+<!--
+- For datasets which has official splits, we follow their splits.
+- For official split which has no `val` part, e.g., AVA dataset, we random separate 5% from training data as validation.
+- For small datasets which requires n-split results, we use `train:val=8:2`  ratio.
+- All random seeds are set to `123` when needed.
+ -->
+- 对于有官方分割的数据集，我们遵循它们的分割。
+- 对于没有 `val` 部分的官方分割，例如 AVA 数据集，我们从训练数据中随机分离 5% 作为验证。
+- 对于需要 n 分割结果的小数据集，我们使用 `train:val=8:2` 比率。
+- 需要时所有随机种子都设置为 `123` 。
+
+<!--
+## Specific Datasets and Dataloader
+ -->
+## 特定数据集和数据加载器
+
+<!--
+Some of the supported datasets have different label formats and file organizations, and we create specific dataloader for them:
+ -->
+一些支持的数据集具有不同的标签格式和文件组织，我们为它们创建特定的数据加载器：
+
+<!--
+- Live Challenge. The first 7 samples are usually removed in the related works.
+- AVA. Different label formats.
+- PieAPP. Different label formats.
+- BAPPS. Different label formats.
+ -->
+- Live Challenge. 前 7 个样本通常在相关工作中被删除。
+- AVA. 不同的标签格式。
+- PieAPP. 不同的标签格式。
+- BAPPS. 不同的标签格式。
+
+<!--
+## Test Dataloader
+ -->
+## 测试数据加载器
+
+<!--
+You may use `tests/test_datasets.py` to test whether a dataset can be correctly loaded.
+ -->
+您可以使用 `tests/test_datasets.py` 来测试数据集是否可以正确加载。
+
