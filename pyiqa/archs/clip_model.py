@@ -11,6 +11,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+debug=0
+
 
 _MODELS = {
     "RN50": "https://openaipublic.azureedge.net/clip/models/afeb0e10f9e5a86da6080e35cf09123aca3b358a0c3e3b6c78a7b63bc04b6762/RN50.pt",
@@ -93,6 +95,8 @@ def load(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_a
             # loading JIT archive
             model = torch.jit.load(opened_file, map_location=device if jit else "cpu").eval()
             state_dict = None
+            if debug:
+                print(f"{__name__} JIT load pre-Trained CLIP module.")
         except RuntimeError:
             # loading saved state dict
             if jit:
@@ -101,6 +105,8 @@ def load(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_a
             state_dict = torch.load(opened_file, map_location="cpu")
 
     if not jit:
+        if debug:
+            print(f"{__name__} build_model, device: {str(device)}")
         model = build_model(state_dict or model.state_dict()).to(device)
         if str(device) == "cpu":
             model.float()
@@ -258,6 +264,11 @@ class ModifiedResNet(nn.Module):
     - There are now 3 "stem" convolutions as opposed to 1, with an average pool instead of a max pool.
     - Performs anti-aliasing strided convolutions, where an avgpool is prepended to convolutions with stride > 1
     - The final pooling layer is a QKV attention instead of an average pool
+
+    ResNet 类与 torchvision 的实现类似，但包含以下更改：
+     - 现在有 3 个“主干”卷积（而不是 1 个），并使用平均池化而不是最大池化。
+     - 执行抗锯齿跨步卷积，其中 avgpool 被添加到跨步 > 1 的卷积中
+     - 最终的池化层是QKV注意力而不是平均池化
     """
 
     def __init__(self, layers, output_dim, heads, input_resolution=224, width=64):
@@ -267,12 +278,12 @@ class ModifiedResNet(nn.Module):
 
         # the 3-layer stem
         self.conv1 = nn.Conv2d(3, width // 2, kernel_size=3, stride=2, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(width // 2)
+        self.bn1 = nn.BatchNorm2d(width // 2) # 数据的归一化处理
         self.conv2 = nn.Conv2d(width // 2, width // 2, kernel_size=3, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(width // 2)
         self.conv3 = nn.Conv2d(width // 2, width, kernel_size=3, padding=1, bias=False)
         self.bn3 = nn.BatchNorm2d(width)
-        self.avgpool = nn.AvgPool2d(2)
+        self.avgpool = nn.AvgPool2d(2) # 二维平均池化操作
         self.relu = nn.ReLU(inplace=True)
 
         # residual layers
@@ -282,7 +293,7 @@ class ModifiedResNet(nn.Module):
         self.layer3 = self._make_layer(width * 4, layers[2], stride=2)
         self.layer4 = self._make_layer(width * 8, layers[3], stride=2)
 
-        embed_dim = width * 32  # the ResNet feature dimension
+        embed_dim = width * 32  # the ResNet feature dimension ResNet 特征维度
         self.attnpool = AttentionPool2d(input_resolution // 32, embed_dim, heads, output_dim)
 
     def _make_layer(self, planes, blocks, stride=1):
@@ -534,6 +545,9 @@ class CLIP(nn.Module):
         if text_features is None:
             text_features = self.encode_text(text)
 
+        if debug:
+            print(f"{__name__} image_features: {image_features.shape}")
+            print(f"{__name__} text_features: {text_features.shape}")
         # normalized features
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
         text_features = text_features / text_features.norm(dim=-1, keepdim=True)
@@ -573,6 +587,7 @@ def convert_weights(model: nn.Module):
 
 def build_model(state_dict: dict):
     vit = "visual.proj" in state_dict
+    print(f"{__name__} state_dict len: {len(state_dict)}")
 
     if vit:
         vision_width = state_dict["visual.conv1.weight"].shape[0]
@@ -598,6 +613,15 @@ def build_model(state_dict: dict):
     transformer_heads = transformer_width // 64
     transformer_layers = len(set(k.split(".")[2] for k in state_dict if k.startswith(f"transformer.resblocks")))
 
+    if debug:
+        print(f"{__name__} embed_dim: {embed_dim}\n\
+                       image_resolution: {image_resolution}\n\
+                       vision_layers: {vision_layers[0]}\n\
+                       vision_width: {vision_width}\n\
+                       context_length: {context_length}\n\
+                       vocab_size: {vocab_size}\n\
+                       transformer_width: {transformer_width}\n\
+                       transformer_layers: {transformer_layers}")
     model = CLIP(
         embed_dim,
         image_resolution, vision_layers, vision_width, vision_patch_size,

@@ -6,6 +6,8 @@ from .losses import CharbonnierLoss, L1Loss, MSELoss, WeightedTVLoss
 
 from .iqa_losses import EMDLoss, PLCCLoss, NiNLoss
 
+debug = 1
+
 __all__ = ['L1Loss', 'MSELoss', 'CharbonnierLoss', 'WeightedTVLoss', 'EMDLoss', 'PLCCLoss', 'NiNLoss']
 
 
@@ -17,6 +19,11 @@ def build_loss(opt):
             type (str): Model type.
     """
     opt = deepcopy(opt)
+    if debug:
+        print(f"{__name__} opt")
+        for k, v in opt.items():
+            print(f"\t{k}: {v}")
+        #exit(0)
     loss_type = opt.pop('type')
     loss = LOSS_REGISTRY.get(loss_type)(**opt)
     logger = get_root_logger()

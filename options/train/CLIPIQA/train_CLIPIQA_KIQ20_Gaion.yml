@@ -1,12 +1,8 @@
 # general settings
-# name: debug_DBCNN_LIVEC
-name: 000_CLIPIQA_RN50_KonIQ10k
-# name: debug_CLIPIQA
-model_type: GeneralIQAModel
-num_gpu: 1  # set num_gpu: 0 for cpu mode
-manual_seed: 123
+# CMD:
+# .\train.py -opt .\options\train\CLIPIQA\train_CLIPIQA_KIQ20.yml --auto_resume
 
-# name: debug_CLIPIQA
+name: 001_CLIPIQA_RN50_KIQ20_Gaion
 model_type: GeneralIQAModel
 num_gpu: 1  # set num_gpu: 0 for cpu mode
 manual_seed: 123
@@ -14,11 +10,11 @@ manual_seed: 123
 # dataset and data loader settings
 datasets:
   train:
-    name: koniq10k
+    name: KIQ20
     type: GeneralNRDataset
-    dataroot_target: ../datasets/koniq10k/512x384
-    meta_info_file: ../datasets/meta_info/meta_info_KonIQ10kDataset.csv
-    split_file: ../datasets/meta_info/koniq10k_official.pkl
+    dataroot_target: ../datasets/KK_dataset/KIQ20_images
+    meta_info_file: ../datasets/meta_info/meta_info_KIQ20Dataset_Gaion.csv
+    split_file: ../datasets/meta_info/KIQ20Dataset_Gaion.pkl
     mos_max: 100
 
     augment:
@@ -34,31 +30,28 @@ datasets:
     prefetch_mode: ~
 
   val:
-    name: koniq10k
+    name: KIQ20
     type: GeneralNRDataset
-    dataroot_target: ../datasets/koniq10k/512x384
-    meta_info_file: ../datasets/meta_info/meta_info_KonIQ10kDataset.csv
-    split_file: ../datasets/meta_info/koniq10k_official.pkl
+    dataroot_target: ../datasets/KK_dataset/KIQ20_images
+    meta_info_file: ../datasets/meta_info/meta_info_KIQ20Dataset_Gaion.csv
+    split_file: ../datasets/meta_info/KIQ20Dataset_Gaion.pkl
     mos_max: 100
 
     num_worker_per_gpu: 4
     batch_size_per_gpu: 8
 
-    # augment:
-    #   center_crop: 384
-
 # network structures
 network:
   type: CLIPIQA 
-  model_type: clipiqa+
+  model_type: clipiqa+_kk
   # backbone: ViT-L/14
   backbone: RN50
-  pretrained: false
+  pretrained: true
   pos_embedding: true
 
 # path
 path:
-  pretrain_network_g: ~
+  pretrain_network_g: ./net_best.pth
   strict_load_g: true
   resume_state: ~
 

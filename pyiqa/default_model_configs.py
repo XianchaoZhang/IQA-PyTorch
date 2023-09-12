@@ -314,6 +314,13 @@ DEFAULT_CONFIGS = OrderedDict({
         },
         'metric_mode': 'NR',
     },
+    'clipiqa+_kk': {
+        'metric_opts': {
+            'type': 'CLIPIQA',
+            'model_type': 'clipiqa+_kk',
+        },
+        'metric_mode': 'NR',
+    },
     'tres': {
         'metric_opts': {
             'type': 'TReS',

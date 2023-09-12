@@ -11,7 +11,7 @@ def main():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, default='../dataset', help='input image/folder path.')
-    parser.add_argument('-m', '--metric_name', type=str, default='clipiqa', help='IQA metric name, case sensitive.')
+    parser.add_argument('-m', '--metric_name', type=str, default='clipiqa+', help='IQA metric name, case sensitive.')
     parser.add_argument('-r', '--recursive', action='store_true', help='Recursive search or not.')
 
     args = parser.parse_args()
@@ -33,7 +33,9 @@ def main():
         #print(f"input_paths: {input_paths}")
         #exit(0)
 
-    attrs = ['Quality', 'Brightness', 'Sharpness', 'Noisiness', 'Colorfulness', 'Contrast', 'Aesthetic', 'Happy', 'Natural', 'Scary', 'Complex']
+    attrs = ['Quality', 'Brightness', 'Sharpness', 'Noisiness', 'Colorfulness', 'Contrast']#, 'Aesthetic', 'Happy', 'Natural', 'Scary', 'Complex']
+    attrs = ['Quality']
+    #attrs = ['Aesthetic', 'Happy', 'Natural', 'Scary', 'Complex']
     attr_rows = []
     fp_rows = []
     fn_row = []
@@ -66,7 +68,8 @@ def main():
                     r=list(i),
                     theta=attrs,
                     fill='toself',
-                    name = fn
+                    name = fn,
+                    textfont={'family':'Arial Black', 'size':40, 'color':'red'}
                 )
             )
         fig.update_layout(
@@ -79,8 +82,8 @@ def main():
             showlegend=False
         )
         fig.show()
-        exit(0)
-        fig.update_xaxes(tickfont_family="Arial Black")
+        #exit(0)
+        fig.update_yaxes(tickfont_family="Arial Black", title={'font':{'size':40}})
         fig.write_image('./test.svg', engine="kaleido")
 
     print(f'Done!')

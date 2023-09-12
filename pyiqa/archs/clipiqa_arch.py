@@ -7,6 +7,7 @@ AAAI 2023.
 Ref url: https://github.com/IceClear/CLIP-IQA
 Re-implmented by: Chaofeng Chen (https://github.com/chaofengc) with the following modification:
     - We assemble multiple prompts to improve the results of clipiqa model.
+    - 我们组装了多个提示来改进 Clipiqa 模型的结果。
 
 """
 import torch
@@ -26,6 +27,7 @@ default_model_urls = {
     'clipiqa+': 'https://github.com/chaofengc/IQA-PyTorch/releases/download/v0.1-weights/CLIP-IQA+_learned_prompts-603f3273.pth',
     'clipiqa+_rn50_512': 'https://github.com/chaofengc/IQA-PyTorch/releases/download/v0.1-weights/CLIPIQA+_RN50_512-89f5d940.pth',
     'clipiqa+_vitL14_512': 'https://github.com/chaofengc/IQA-PyTorch/releases/download/v0.1-weights/CLIPIQA+_ViTL14_512-e66488f2.pth',
+    'clipiqa+_kk': 'net_best.pth'
 }
 
 
@@ -36,6 +38,11 @@ class PromptLearner(nn.Module):
             1. Using n_ctx prefix characters "X"
             2. Appending extra "." at the end
             3. Insert the original text embedding at the middle
+    免责声明：
+         此实现完全遵循以下官方代码：https://github.com/IceClear/CLIP-IQA。我们不知道为什么有些技巧是这样实现的，其中包括
+             1. 使用 n_ctx 前缀字符 “X”
+             2. 在最后附加额外的 “.” 
+             3. 在中间插入原文嵌入
     """
 
     def __init__(self, clip_model, n_ctx=16) -> None:
@@ -43,17 +50,19 @@ class PromptLearner(nn.Module):
 
         # For the following codes about prompts, we follow the official codes to get the same results
         prompt_prefix = " ".join(["X"] * n_ctx) + ' '
-        init_prompts = [prompt_prefix + 'Good photo..', prompt_prefix + 'Bad photo..',
-                        prompt_prefix + 'Bright photo..', prompt_prefix + 'Dark photo..',
-                        prompt_prefix + 'Sharp photo..', prompt_prefix + 'blurry photo..',
-                        prompt_prefix + 'Noisy photo..', prompt_prefix + 'Clean photo..',
-                        prompt_prefix + 'Colorful photo..', prompt_prefix + 'Dull photo..',
-						prompt_prefix + 'High contrast photo..', prompt_prefix + 'Low contrast photo..',
-						prompt_prefix + 'Aesthetic photo..', prompt_prefix + 'Not aesthetic photo..',
-                        prompt_prefix + 'Happy photo..', prompt_prefix + 'Sad photo..',
-						prompt_prefix + 'Natural photo..', prompt_prefix + 'Synthetic photo..',
-                        prompt_prefix + 'Scary photo..', prompt_prefix + 'Peaceful photo..',
-                        prompt_prefix + 'Complex photo..', prompt_prefix + 'Simple photo..']
+          = [
+                        prompt_prefix + 'Good photo..', prompt_prefix + 'Bad photo..',
+                        # prompt_prefix + 'Bright photo..', prompt_prefix + 'Dark photo..',
+                        # prompt_prefix + 'Sharp photo..', prompt_prefix + 'blurry photo..',
+                        # prompt_prefix + 'Noisy photo..', prompt_prefix + 'Clean photo..',
+                        # prompt_prefix + 'Colorful photo..', prompt_prefix + 'Dull photo..',
+						# prompt_prefix + 'High contrast photo..', prompt_prefix + 'Low contrast photo..',
+						# prompt_prefix + 'Aesthetic photo..', prompt_prefix + 'Not aesthetic photo..',
+                        # prompt_prefix + 'Happy photo..', prompt_prefix + 'Sad photo..',
+						# prompt_prefix + 'Natural photo..', prompt_prefix + 'Synthetic photo..',
+                        # prompt_prefix + 'Scary photo..', prompt_prefix + 'Peaceful photo..',
+                        # prompt_prefix + 'Complex photo..', prompt_prefix + 'Simple photo..'
+                        ]
         #print(f"prompt: {init_prompts}")
         #exit(0)
         with torch.no_grad():
@@ -68,16 +77,16 @@ class PromptLearner(nn.Module):
 
         self.n_cls = len(init_prompts)
         self.name_lens = [3, 3,
-                          3, 3,
-                          3, 3,
-                          3, 3,
-                          3, 3,
-                          3, 3,
-                          3, 3,
-                          3, 3,
-                          3, 3,
-                          3, 3,
-                          3, 3,
+                        #   3, 3,
+                        #   3, 3,
+                        #   3, 3,
+                        #   3, 3,
+                        #   3, 3,
+                        #   3, 3,
+                        #   3, 3,
+                        #   3, 3,
+                        #   3, 3,
+                        #   3, 3,
                           ]  # hard coded length, which does not include the extra "." at the end
 
         self.register_buffer("token_prefix", init_embedding[:, :1, :])  # SOS
@@ -145,16 +154,16 @@ class CLIPIQA(nn.Module):
         # Different from original paper, we assemble multiple prompts to improve performance
         self.prompt_pairs = clip.tokenize([
             'Good photo.', 'Bad photo.',
-            'Bright photo.', 'Dark photo.',
-            'Sharp photo.', 'Blurry photo.',
-            'Noisy photo.', 'Clean photo.',
-            'Colorful photo.', 'Dull photo.',
-            'High contrast photo.', 'Low contrast photo.',
-            'Aesthetic photo.', 'Not aesthetic photo.',
-            'Happy photo.', 'Sad photo.',
-            'Natural photo.', 'Synthetic photo.',
-            'Scary photo.', 'Peaceful photo.',
-            'Complex photo.', 'Simple photo.',
+            # 'Bright photo.', 'Dark photo.',
+            # 'Sharp photo.', 'Blurry photo.',
+            # 'Noisy photo.', 'Clean photo.',
+            # 'Colorful photo.', 'Dull photo.',
+            # 'High contrast photo.', 'Low contrast photo.',
+            # 'Aesthetic photo.', 'Not aesthetic photo.',
+            # 'Happy photo.', 'Sad photo.',
+            # 'Natural photo.', 'Synthetic photo.',
+            # 'Scary photo.', 'Peaceful photo.',
+            # 'Complex photo.', 'Simple photo.',
         ])
         #print(f"{__name__} prompt_pair shape: {self.prompt_pairs.shape}")
 
@@ -171,11 +180,18 @@ class CLIPIQA(nn.Module):
         
         if pretrained and 'clipiqa+' in model_type:
             if model_type == 'clipiqa+' and backbone == 'RN50':
+                print(f"use pretrainded model {load_file_from_url(default_model_urls['clipiqa+'])}")
                 self.prompt_learner.ctx.data = torch.load(load_file_from_url(default_model_urls['clipiqa+']))
+            elif model_type == 'clipiqa+_kk' and backbone == 'RN50':
+                print(f"use pretrainded model {model_type}")
+                load_pretrained_network(self, model_type, True, 'params')
             elif model_type in default_model_urls.keys():
+                print(f"backbone is not RN50")
                 load_pretrained_network(self, default_model_urls[model_type], True, 'params')
             else:
                 raise(f'No pretrained model for {model_type}')
+        else:
+            print(f"Do not use pretainded model!!!")
     
     def forward(self, x):
         # preprocess image
@@ -193,6 +209,6 @@ class CLIPIQA(nn.Module):
                 x, None, text_features=learned_prompt_feature, pos_embedding=self.pos_embedding)
 
         probs = logits_per_image.reshape(logits_per_image.shape[0], -1, 2).softmax(dim=-1)
-        #print(f"probs: {probs}")
+        print(f"probs: {probs}")
 
         return probs[..., 0] #.mean(dim=1, keepdim=True)

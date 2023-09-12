@@ -5,6 +5,7 @@ from os import path as osp
 from pyiqa.utils import get_root_logger, scandir
 from pyiqa.utils.registry import ARCH_REGISTRY
 
+debug = 1
 
 __all__ = ['build_network']
 
@@ -19,6 +20,11 @@ _arch_modules = [importlib.import_module(f'pyiqa.archs.{file_name}') for file_na
 
 def build_network(opt):
     opt = deepcopy(opt)
+    if debug:
+        print(f"{__name__} opt")
+        for k, v in opt.items():
+            print(f"\t{k}: {v}")
+        #exit(0)
     network_type = opt.pop('type')
     net = ARCH_REGISTRY.get(network_type)(**opt)
     logger = get_root_logger()

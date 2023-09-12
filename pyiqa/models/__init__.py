@@ -5,6 +5,8 @@ from os import path as osp
 from pyiqa.utils import get_root_logger, scandir
 from pyiqa.utils.registry import MODEL_REGISTRY
 
+debug = 1
+
 __all__ = ['build_model']
 
 # automatically scan and import model modules for registry
@@ -24,6 +26,11 @@ def build_model(opt):
             model_type (str): Model type.
     """
     opt = deepcopy(opt)
+    if debug:
+        print(f"{__name__} opt")
+        for k, v in opt.items():
+            print(f"\t{k}: {v}")
+        #exit(0)
     model = MODEL_REGISTRY.get(opt['model_type'])(opt)
     logger = get_root_logger()
     logger.info(f'Model [{model.__class__.__name__}] is created.')

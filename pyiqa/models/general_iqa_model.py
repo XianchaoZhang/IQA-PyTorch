@@ -10,6 +10,7 @@ from pyiqa.utils import get_root_logger, imwrite, tensor2img
 from pyiqa.utils.registry import MODEL_REGISTRY
 from .base_model import BaseModel
 
+debug = 1
 
 @MODEL_REGISTRY.register()
 class GeneralIQAModel(BaseModel):
@@ -37,6 +38,7 @@ class GeneralIQAModel(BaseModel):
         train_opt = self.opt['train']
 
         self.net_best = build_network(self.opt['network']).to(self.device)
+        self.print_network(self.net_best)
 
         # define losses
         if train_opt.get('mos_loss_opt'):
@@ -57,13 +59,20 @@ class GeneralIQAModel(BaseModel):
     def setup_optimizers(self):
         train_opt = self.opt['train']
         optim_params = []
+        if debug:
+            print(f"{__name__} net.named_parameters")
+            logger = get_root_logger()
+            #logger.info(f"{__name__} net.named_parameters")
         for k, v in self.net.named_parameters():
+            if debug:
+                print(f"\t{k}: {v}")
+                #logger.info(f"\t{k}: {v}")
             if v.requires_grad:
                 optim_params.append(v)
             else:
                 logger = get_root_logger()
                 logger.warning(f'Params {k} will not be optimized.')
-
+        #exit(0)
         optim_type = train_opt['optim'].pop('type')
         self.optimizer = self.get_optimizer(optim_type, optim_params, **train_opt['optim'])
         self.optimizers.append(self.optimizer)

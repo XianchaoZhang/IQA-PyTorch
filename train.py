@@ -32,6 +32,10 @@ def create_train_val_dataloader(opt, logger):
     # create train and val dataloaders
     train_loader, val_loaders = None, []
     for phase, dataset_opt in opt['datasets'].items():
+        if debug:
+            print(f"{__name__} dataset opt")
+            for k, v in dataset_opt.items():
+                print(f"\t{k}: {v}")
         if phase == 'train':
             dataset_enlarge_ratio = dataset_opt.get('dataset_enlarge_ratio', 1)
             train_set = build_dataset(dataset_opt)
@@ -85,6 +89,8 @@ def load_resume_state(opt):
             print(f"{__name__} {state_path}")
         if osp.isdir(state_path):
             states = list(scandir(state_path, suffix='state', recursive=False, full_path=False))
+            if debug:
+                print(f"states: {states}")
             if len(states) != 0:
                 states = [float(v.split('.state')[0]) for v in states]
                 resume_state_path = osp.join(state_path, f'{max(states):.0f}.state')
@@ -107,8 +113,8 @@ def train_pipeline(root_path, opt=None, args=None):
     if opt is None and args is None:
         opt, args = parse_options(root_path, is_train=True)
     opt['root_path'] = root_path
-    print(f"{__name__}\n{opt}\n{args}")
-    exit(0)
+    #print(f"{__name__}\n{opt}\n{args}")
+    #exit(0)
 
     torch.backends.cudnn.benchmark = True
     # torch.backends.cudnn.deterministic = True
@@ -154,6 +160,9 @@ def train_pipeline(root_path, opt=None, args=None):
 
     # dataloader prefetcher
     prefetch_mode = opt['datasets']['train'].get('prefetch_mode')
+    if debug:
+        print(f"prefech mode: {prefetch_mode}")
+        #exit(0)
     if prefetch_mode is None or prefetch_mode == 'cpu':
         prefetcher = CPUPrefetcher(train_loader)
     elif prefetch_mode == 'cuda':
@@ -245,5 +254,5 @@ def train_pipeline(root_path, opt=None, args=None):
     return model.best_metric_results
 
 if __name__ == '__main__':
-    root_path = osp.abspath(__file__)
+    root_path = osp.abspath(osp.join(__file__, os.pardir))
     train_pipeline(root_path)

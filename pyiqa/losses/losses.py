@@ -88,6 +88,7 @@ class MSELoss(nn.Module):
             target (Tensor): of shape (N, C, H, W). Ground truth tensor.
             weight (Tensor, optional): of shape (N, C, H, W). Element-wise weights. Default: None.
         """
+        print(f"{__name__}\n\tPredicted: {pred}\n\tGround truth: {target}")
         return self.loss_weight * mse_loss(pred, target, weight, reduction=self.reduction)
 
 

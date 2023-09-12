@@ -13,6 +13,7 @@ from pyiqa.data.transforms import transform_mapping, augment, PairedToTensor
 from pyiqa.utils import FileClient, imfrombytes, img2tensor
 from pyiqa.utils.registry import DATASET_REGISTRY
 
+debug = 1
 
 @DATASET_REGISTRY.register()
 class GeneralNRDataset(data.Dataset):
@@ -42,7 +43,20 @@ class GeneralNRDataset(data.Dataset):
             with open(opt['split_file'], 'rb') as f:
                 split_dict = pickle.load(f)
                 splits = split_dict[split_index][self.phase]
-            self.paths_mos = [self.paths_mos[i] for i in splits] 
+            self.paths_mos = [self.paths_mos[i] for i in splits]
+            if debug:
+                #print(f"{split_file_path}, {split_index}")
+                #print(self.paths_mos)
+                print(f"{__name__} opt")
+                for k, v in self.opt.items():
+                    print(f"\t{k}: {v}")
+                print(f"{__name__} split_dict")
+                for k, v in split_dict.items():
+                    print(f"\t{k}: ")
+                print(f"splits: {splits[:10]}")
+                print(f"paths_mos: {self.paths_mos[:10]}")
+                #exit(0) 
+                pass
         
         dmos_max = opt.get('dmos_max', 0.)
         if dmos_max:
