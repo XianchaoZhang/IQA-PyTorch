@@ -9,6 +9,7 @@ from .loss_util import weighted_loss
 
 _reduction_modes = ['none', 'mean', 'sum']
 
+debug = 1
 
 @weighted_loss
 def l1_loss(pred, target):
@@ -77,6 +78,8 @@ class MSELoss(nn.Module):
         super(MSELoss, self).__init__()
         if reduction not in ['none', 'mean', 'sum']:
             raise ValueError(f'Unsupported reduction mode: {reduction}. Supported ones are: {_reduction_modes}')
+
+        if debug: print(f"{__name__} loss_weight {loss_weight} reduction {reduction}")
 
         self.loss_weight = loss_weight
         self.reduction = reduction

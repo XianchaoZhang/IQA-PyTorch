@@ -146,6 +146,7 @@ def train_pipeline(root_path, opt=None, args=None):
 
     # create model
     model = build_model(opt)
+
     if resume_state:  # resume training
         model.resume_training(resume_state)  # handle optimizers and schedulers
         logger.info(f"Resuming training from epoch: {resume_state['epoch']}, " f"iter: {resume_state['iter']}.")

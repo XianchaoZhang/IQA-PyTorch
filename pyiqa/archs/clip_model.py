@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-debug=0
+debug=1
 
 
 _MODELS = {
@@ -93,10 +93,13 @@ def load(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_a
     with open(model_path, 'rb') as opened_file:
         try:
             # loading JIT archive
+            # 加载之前使用 torch.jit.save 保存的 ScriptModule 或 ScriptFunction
+            # 返回 ScriptModule 对象
+            # eval() 将模块设置为 evaluation 模式。
             model = torch.jit.load(opened_file, map_location=device if jit else "cpu").eval()
             state_dict = None
             if debug:
-                print(f"{__name__} JIT load pre-Trained CLIP module.")
+                print(f"{__name__} JIT load pre-Trained CLIP module backbone: {model_path}")
         except RuntimeError:
             # loading saved state dict
             if jit:
@@ -165,6 +168,7 @@ def load(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_a
     return model
 
 
+# ModifiedResNet50 中标准残差结构--Bottleneck 的定义
 class Bottleneck(nn.Module):
     expansion = 4
 
@@ -172,6 +176,7 @@ class Bottleneck(nn.Module):
         super().__init__()
 
         # all conv layers have stride 1. an avgpool is performed after the second convolution when stride > 1
+        # 所有的卷积层的步长均为1,但是当步长大于1时,在第二次卷积之后将会有一个平均池化层
         self.conv1 = nn.Conv2d(inplanes, planes, 1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
 
@@ -211,6 +216,10 @@ class Bottleneck(nn.Module):
         return out
 
 
+# Attention 机制可以认为它是一种资源分配的机制，可以理解为对于原本平均分配的资源根据 attention 对象的重要程度重新分配资源，
+# 重要的单位就多分一点，不重要或者不好的单位就少分一点，在深度神经网络的结构设计中，attention 所要分配的资源基本上就是权重了
+# 视觉注意力分为几种，核心思想是基于原有的数据找到其之间的关联性，然后突出其某些重要特征，有通道注意力，像素注意力，多阶注意力
+# 等，也有把 NLP 中的自注意力引入。
 class AttentionPool2d(nn.Module):
     def __init__(self, spacial_dim: int, embed_dim: int, num_heads: int, output_dim: int = None):
         super().__init__()
@@ -294,8 +303,10 @@ class ModifiedResNet(nn.Module):
         self.layer4 = self._make_layer(width * 8, layers[3], stride=2)
 
         embed_dim = width * 32  # the ResNet feature dimension ResNet 特征维度
+        # 对于最后的平均池化层我们使用一个QKV注意力池化层来进行替代
         self.attnpool = AttentionPool2d(input_resolution // 32, embed_dim, heads, output_dim)
 
+    # ModifiedResNet50中的残差层的定义,其中的 blocks 即为标准的残差结构--Bottleneck
     def _make_layer(self, planes, blocks, stride=1):
         layers = [Bottleneck(self._inplanes, planes, stride)]
 
@@ -306,6 +317,7 @@ class ModifiedResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x, return_token=False, pos_embedding=False):
+        # 在这里我们将三个卷积层集成到一个函数中使用,每一层均为 conv->bn->rel
         def stem(x):
             for conv, bn in [(self.conv1, self.bn1), (self.conv2, self.bn2), (self.conv3, self.bn3)]:
                 x = self.relu(bn(conv(x)))
@@ -326,7 +338,8 @@ class ModifiedResNet(nn.Module):
             x = self.attnpool(x, return_token, pos_embedding)
             return x
 
-
+# LN 取的是同一个样本的不同通道做归一化。
+# BN 取不同样本的同一个通道的特征做归一化
 class LayerNorm(nn.LayerNorm):
     """Subclass torch's LayerNorm to handle fp16."""
 
@@ -335,18 +348,22 @@ class LayerNorm(nn.LayerNorm):
         ret = super().forward(x.type(torch.float32))
         return ret.type(orig_type)
 
-
+# QuickGELU激活函数的定义,在 transformer 结构中的 MLP 层中被使用
 class QuickGELU(nn.Module):
     def forward(self, x: torch.Tensor):
         return x * torch.sigmoid(1.702 * x)
 
-
+# transformer 模块的定义,将会在transformer结构中被使用
+# 1.多头注意力层
+# 2.LayerNorm层
+# 3.MLP层
 class ResidualAttentionBlock(nn.Module):
     def __init__(self, d_model: int, n_head: int, attn_mask: torch.Tensor = None):
         super().__init__()
 
         self.attn = nn.MultiheadAttention(d_model, n_head)
         self.ln_1 = LayerNorm(d_model)
+        # 在MLP层中首先是进行一次全连接,之后是过QuickGELU激活函数,最后是通过投影进行映射
         self.mlp = nn.Sequential(OrderedDict([
             ("c_fc", nn.Linear(d_model, d_model * 4)),
             ("gelu", QuickGELU()),
@@ -355,6 +372,7 @@ class ResidualAttentionBlock(nn.Module):
         self.ln_2 = LayerNorm(d_model)
         self.attn_mask = attn_mask
 
+    # 该函数的作用是对输入的张量使用多头注意力机制
     def attention(self, x: torch.Tensor):
         self.attn_mask = self.attn_mask.to(dtype=x.dtype, device=x.device) if self.attn_mask is not None else None
         return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask)[0]
@@ -375,7 +393,7 @@ class Transformer(nn.Module):
     def forward(self, x: torch.Tensor):
         return self.resblocks(x)
 
-
+# VisionTransformer 结构的定义,输入图片的通道数为 3
 class VisionTransformer(nn.Module):
     def __init__(self, input_resolution: int, patch_size: int, width: int, layers: int, heads: int, output_dim: int):
         super().__init__()
@@ -385,6 +403,7 @@ class VisionTransformer(nn.Module):
                                kernel_size=patch_size, stride=patch_size, bias=False)
 
         scale = width ** -0.5
+        # 在这里我们可以用 nn.Parameter() 来将这个随机初始化的 Tensor 注册为可学习的参数 Parameter
         self.class_embedding = nn.Parameter(scale * torch.randn(width))
         self.positional_embedding = nn.Parameter(scale * torch.randn((input_resolution // patch_size) ** 2 + 1, width))
         self.ln_pre = LayerNorm(width)
@@ -395,6 +414,7 @@ class VisionTransformer(nn.Module):
         self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
 
     def forward(self, x: torch.Tensor, return_token=False, pos_embedding=False):
+        # 此处的卷积可以将张量的 shape 转变为 batch_size,width,grid,grid(grid=input_resolution/patch_size)
         x = self.conv1(x)  # shape = [*, width, grid, grid]
         x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
         x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
@@ -404,6 +424,7 @@ class VisionTransformer(nn.Module):
         if pos_embedding:
             positional_embedding_resize = F.interpolate(self.positional_embedding.unsqueeze(
                 0).unsqueeze(0), size=(x.size(1), x.size(2)), mode='bicubic').squeeze(0).squeeze(0)
+            # 加上其位置编码信息,并且 pass through LayerNorm 层
             x = x + positional_embedding_resize.to(x.dtype)
 
         x = self.ln_pre(x)
@@ -424,7 +445,7 @@ class VisionTransformer(nn.Module):
         else:
             return x
 
-
+# CLIP模型的定义
 class CLIP(nn.Module):
     def __init__(self,
                  embed_dim: int,
@@ -442,8 +463,21 @@ class CLIP(nn.Module):
                  ):
         super().__init__()
 
+        if debug:
+            print(f"{__name__} params for CLIP model\n\
+                    embed_dim: {embed_dim}\n\
+                    image_resolution: {image_resolution}\n\
+                    vision_layers: {vision_layers[0]}\n\
+                    vision_width: {vision_width}\n\
+                    context_length: {context_length}\n\
+                    vocab_size: {vocab_size}\n\
+                    transformer_width: {transformer_width}\n\
+                    transformer_layers: {transformer_layers}")
+
+        # 定义文本的长度
         self.context_length = context_length
 
+        # 对于 image 部分,可以使用 ModifiedResNet50 或者 ViT
         if isinstance(vision_layers, (tuple, list)):
             vision_heads = vision_width * 32 // 64
             self.visual = ModifiedResNet(
@@ -464,6 +498,7 @@ class CLIP(nn.Module):
                 output_dim=embed_dim
             )
 
+        # 对于文字部分则直接使用Text Transformer即可
         self.transformer = Transformer(
             width=transformer_width,
             layers=transformer_layers,
@@ -472,15 +507,23 @@ class CLIP(nn.Module):
         )
 
         self.vocab_size = vocab_size
+        # token 嵌入以及位置嵌入还有对于 LayerNorm 的进一步的定义
+        # 用来实现词与词向量的映射，通俗来讲就是将文字转换为一串数字，作为训练的一层，随模型训练得到适合的词向量。
         self.token_embedding = nn.Embedding(vocab_size, transformer_width)
         self.positional_embedding = nn.Parameter(torch.empty(self.context_length, transformer_width))
         self.ln_final = LayerNorm(transformer_width)
 
+        # 在这里我们可以用 nn.Parameter() 来将这个随机初始化的 Tensor 注册为可学习的参数 Parameter
+        # torch.empty 用于返回一个未初始化的 tensor
+        # torch.zeros 用于将 tensor 中元素值全置为 0
+        # torch.ones 用于将 tensor 中元素值全置为 1
+        # logit_scale 与 cosine similarities 有关
         self.text_projection = nn.Parameter(torch.empty(transformer_width, embed_dim))
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
 
         self.initialize_parameters()
 
+    # 部分权值的初始化操作
     def initialize_parameters(self):
         nn.init.normal_(self.token_embedding.weight, std=0.02)
         nn.init.normal_(self.positional_embedding, std=0.01)
@@ -540,15 +583,18 @@ class CLIP(nn.Module):
 
         return x
 
+    # CLIP 这个类的前向传播函数的定义,即为 CLIP 整体模型的定义
     def forward(self, image, text, pos_embedding=False, text_features=None):
         image_features = self.encode_image(image, pos_embedding)
         if text_features is None:
             text_features = self.encode_text(text)
 
-        if debug:
+        if 0:
             print(f"{__name__} image_features: {image_features.shape}")
             print(f"{__name__} text_features: {text_features.shape}")
         # normalized features
+        # image_feature: torch.Size([1, 1024])
+        # text_feature: torch.Size([2, 1024])
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
         text_features = text_features / text_features.norm(dim=-1, keepdim=True)
 
@@ -561,6 +607,7 @@ class CLIP(nn.Module):
         return logits_per_image, logits_per_text
 
 
+# 为了训练加速使用到了混合精度运算
 def convert_weights(model: nn.Module):
     """Convert applicable model parameters to fp16"""
 
@@ -584,10 +631,12 @@ def convert_weights(model: nn.Module):
 
     model.apply(_convert_weights_to_fp16)
 
-
+# CLIP 模型的创建
 def build_model(state_dict: dict):
     vit = "visual.proj" in state_dict
-    print(f"{__name__} state_dict len: {len(state_dict)}")
+    print(f"{__name__} CLIP backbone state_dict len: {len(state_dict)}")
+    if debug:
+        pass
 
     if vit:
         vision_width = state_dict["visual.conv1.weight"].shape[0]
@@ -605,6 +654,10 @@ def build_model(state_dict: dict):
         vision_patch_size = None
         assert output_width ** 2 + 1 == state_dict["visual.attnpool.positional_embedding"].shape[0]
         image_resolution = output_width * 32
+        if debug:
+            for k in state_dict:
+                #print(f"\t{k}")
+                pass
 
     embed_dim = state_dict["text_projection"].shape[1]
     context_length = state_dict["positional_embedding"].shape[0]
@@ -613,15 +666,6 @@ def build_model(state_dict: dict):
     transformer_heads = transformer_width // 64
     transformer_layers = len(set(k.split(".")[2] for k in state_dict if k.startswith(f"transformer.resblocks")))
 
-    if debug:
-        print(f"{__name__} embed_dim: {embed_dim}\n\
-                       image_resolution: {image_resolution}\n\
-                       vision_layers: {vision_layers[0]}\n\
-                       vision_width: {vision_width}\n\
-                       context_length: {context_length}\n\
-                       vocab_size: {vocab_size}\n\
-                       transformer_width: {transformer_width}\n\
-                       transformer_layers: {transformer_layers}")
     model = CLIP(
         embed_dim,
         image_resolution, vision_layers, vision_width, vision_patch_size,

@@ -2,7 +2,7 @@
 # CMD:
 # .\train.py -opt .\options\train\CLIPIQA\train_CLIPIQA_KIQ20.yml --auto_resume
 
-name: 001_CLIPIQA_RN50_KIQ20_initial_Galaxy_A53
+name: 001_CLIPIQA_RN50_KIQ20_initial
 model_type: GeneralIQAModel
 num_gpu: 1  # set num_gpu: 0 for cpu mode
 manual_seed: 123
@@ -13,8 +13,8 @@ datasets:
     name: KIQ20
     type: GeneralNRDataset
     dataroot_target: ../datasets/KK_dataset/KIQ20_images
-    meta_info_file: ../datasets/meta_info/meta_info_KIQ20Dataset_Galaxy_A53.csv
-    split_file: ../datasets/meta_info/KIQ20Dataset_Galaxy_A53.pkl
+    meta_info_file: ../datasets/meta_info/meta_info_KIQ20Dataset_Austion.csv
+    split_file: ../datasets/meta_info/KIQ20Dataset_Austion.pkl
     mos_max: 100
 
     augment:
@@ -24,8 +24,8 @@ datasets:
 
     # data loader
     use_shuffle: true
-    num_worker_per_gpu: 2
-    batch_size_per_gpu: 2
+    num_worker_per_gpu: 4
+    batch_size_per_gpu: 8
     dataset_enlarge_ratio: 1
     prefetch_mode: ~
 
@@ -33,12 +33,12 @@ datasets:
     name: KIQ20
     type: GeneralNRDataset
     dataroot_target: ../datasets/KK_dataset/KIQ20_images
-    meta_info_file: ../datasets/meta_info/meta_info_KIQ20Dataset_Galaxy_A53.csv
-    split_file: ../datasets/meta_info/KIQ20Dataset_Galaxy_A53.pkl
+    meta_info_file: ../datasets/meta_info/meta_info_KIQ20Dataset_Austion.csv
+    split_file: ../datasets/meta_info/KIQ20Dataset_Austion.pkl
     mos_max: 100
 
-    num_worker_per_gpu: 2
-    batch_size_per_gpu: 2
+    num_worker_per_gpu: 4
+    batch_size_per_gpu: 8
 
 # network structures
 network:

@@ -22,12 +22,13 @@ from pyiqa.archs.arch_util import load_pretrained_network
 import clip
 from .clip_model import load
 
+debug = 1
 
 default_model_urls = {
     'clipiqa+': 'https://github.com/chaofengc/IQA-PyTorch/releases/download/v0.1-weights/CLIP-IQA+_learned_prompts-603f3273.pth',
     'clipiqa+_rn50_512': 'https://github.com/chaofengc/IQA-PyTorch/releases/download/v0.1-weights/CLIPIQA+_RN50_512-89f5d940.pth',
     'clipiqa+_vitL14_512': 'https://github.com/chaofengc/IQA-PyTorch/releases/download/v0.1-weights/CLIPIQA+_ViTL14_512-e66488f2.pth',
-    'clipiqa+_kk': 'net_best.pth'
+    'clipiqa+_kk': './net_best.pth'
 }
 
 
@@ -45,49 +46,27 @@ class PromptLearner(nn.Module):
              3. 在中间插入原文嵌入
     """
 
-    def __init__(self, clip_model, n_ctx=16) -> None:
+    def __init__(self, clip_model, prompts, n_ctx=16) -> None:
         super().__init__()
 
         # For the following codes about prompts, we follow the official codes to get the same results
         prompt_prefix = " ".join(["X"] * n_ctx) + ' '
-          = [
-                        prompt_prefix + 'Good photo..', prompt_prefix + 'Bad photo..',
-                        # prompt_prefix + 'Bright photo..', prompt_prefix + 'Dark photo..',
-                        # prompt_prefix + 'Sharp photo..', prompt_prefix + 'blurry photo..',
-                        # prompt_prefix + 'Noisy photo..', prompt_prefix + 'Clean photo..',
-                        # prompt_prefix + 'Colorful photo..', prompt_prefix + 'Dull photo..',
-						# prompt_prefix + 'High contrast photo..', prompt_prefix + 'Low contrast photo..',
-						# prompt_prefix + 'Aesthetic photo..', prompt_prefix + 'Not aesthetic photo..',
-                        # prompt_prefix + 'Happy photo..', prompt_prefix + 'Sad photo..',
-						# prompt_prefix + 'Natural photo..', prompt_prefix + 'Synthetic photo..',
-                        # prompt_prefix + 'Scary photo..', prompt_prefix + 'Peaceful photo..',
-                        # prompt_prefix + 'Complex photo..', prompt_prefix + 'Simple photo..'
-                        ]
-        #print(f"prompt: {init_prompts}")
-        #exit(0)
+        init_prompts = [prompt_prefix+i for i in prompts]
+
+        if debug: print(f"{__name__} {len(init_prompts)} prompt:\n\t{init_prompts}")
         with torch.no_grad():
+            # 返回给定输入字符串的标记化表示
             txt_token = clip.tokenize(init_prompts)
             self.tokenized_prompts = txt_token
+            # nn.Embedding, 把 clip.tokenize 生成出来的维度为[batch_size,n_ctx]的text向量，转换成[batch_size, n_ctx, d_model]的向量。
             init_embedding = clip_model.token_embedding(txt_token)
 
         init_ctx = init_embedding[:, 1: 1 + n_ctx]
+        if 0: print(f"init_ctx: {init_ctx}")
         self.ctx = nn.Parameter(init_ctx)
-
         self.n_ctx = n_ctx
-
         self.n_cls = len(init_prompts)
-        self.name_lens = [3, 3,
-                        #   3, 3,
-                        #   3, 3,
-                        #   3, 3,
-                        #   3, 3,
-                        #   3, 3,
-                        #   3, 3,
-                        #   3, 3,
-                        #   3, 3,
-                        #   3, 3,
-                        #   3, 3,
-                          ]  # hard coded length, which does not include the extra "." at the end
+        self.name_lens = [3] * self.n_cls # hard coded length, which does not include the extra "." at the end
 
         self.register_buffer("token_prefix", init_embedding[:, :1, :])  # SOS
         self.register_buffer("token_suffix", init_embedding[:, 1 + n_ctx:, :])  # CLS, EOS
@@ -118,8 +97,9 @@ class PromptLearner(nn.Module):
                 dim=1,
             )
             prompts.append(prompt)
+        #  torch.Size([2, 77, 512])
         prompts = torch.cat(prompts, dim=0)
-        #print(f"learn prompts: {prompts}")
+        if 0: print(f"{__name__} learn prompts: {type(prompts)} {prompts.shape}\n\t{prompts}")
         return prompts
 
     def forward(self, clip_model):
@@ -133,8 +113,9 @@ class PromptLearner(nn.Module):
 
         # x.shape = [batch_size, n_ctx, transformer.width]
         # take features from the eot embedding (eot_token is the highest number in each sequence)
+        # torch.Size([2, 1024])
         x = x[torch.arange(x.shape[0]), self.tokenized_prompts.argmax(dim=-1)] @ clip_model.text_projection
-        #print(f"learn prompt x: {x}")
+        if 0: print(f"{__name__} learn prompt x: type {type(x)} {x.shape}\n\t{x}")
 
         return x
 
@@ -149,10 +130,17 @@ class CLIPIQA(nn.Module):
                  ) -> None:
         super().__init__()
 
+        if debug:
+            print(f"{__name__}\n\
+                  model_type: {model_type}\n\
+                  backbone: {backbone}\n\
+                  pretrained: {pretrained}\n\
+                  pos_embedding: {pos_embedding}")
+
+        # clip_model: pyiqa.archs.clip_model.CLIP
         self.clip_model = [load(backbone, 'cpu')]  # avoid saving clip weights
-        #print(f"{__name__} clip_model: {type(self.clip_model[0])}")
         # Different from original paper, we assemble multiple prompts to improve performance
-        self.prompt_pairs = clip.tokenize([
+        prompts = [
             'Good photo.', 'Bad photo.',
             # 'Bright photo.', 'Dark photo.',
             # 'Sharp photo.', 'Blurry photo.',
@@ -164,14 +152,16 @@ class CLIPIQA(nn.Module):
             # 'Natural photo.', 'Synthetic photo.',
             # 'Scary photo.', 'Peaceful photo.',
             # 'Complex photo.', 'Simple photo.',
-        ])
-        #print(f"{__name__} prompt_pair shape: {self.prompt_pairs.shape}")
+        ]
+        self.prompt_pairs = clip.tokenize(prompts)
+        if debug: print(f"{__name__} prompt_pair shape: {self.prompt_pairs.shape}")
 
         self.model_type = model_type
         self.pos_embedding = pos_embedding
         if 'clipiqa+' in model_type:
-            self.prompt_learner = PromptLearner(self.clip_model[0])
+            self.prompt_learner = PromptLearner(self.clip_model[0], prompts)
 
+        # Pytorch 通过 view 机制可以实现 tensor 之间的内存共享
         self.default_mean = torch.Tensor(OPENAI_CLIP_MEAN).view(1, 3, 1, 1)
         self.default_std = torch.Tensor(OPENAI_CLIP_STD).view(1, 3, 1, 1)
 
@@ -180,25 +170,23 @@ class CLIPIQA(nn.Module):
         
         if pretrained and 'clipiqa+' in model_type:
             if model_type == 'clipiqa+' and backbone == 'RN50':
-                print(f"use pretrainded model {load_file_from_url(default_model_urls['clipiqa+'])}")
+                if debug: print(f"{__name__} use {load_file_from_url(default_model_urls['clipiqa+'])}")
                 self.prompt_learner.ctx.data = torch.load(load_file_from_url(default_model_urls['clipiqa+']))
-            elif model_type == 'clipiqa+_kk' and backbone == 'RN50':
-                print(f"use pretrainded model {model_type}")
-                load_pretrained_network(self, model_type, True, 'params')
             elif model_type in default_model_urls.keys():
-                print(f"backbone is not RN50")
+                if debug: print(f"{__name__} do not use clipiqa+ pretrained model")
                 load_pretrained_network(self, default_model_urls[model_type], True, 'params')
             else:
-                raise(f'No pretrained model for {model_type}')
+                raise(f'{__name__} No pretrained model for {model_type}')
         else:
-            print(f"Do not use pretainded model!!!")
+           if debug: print(f"{__name__} Do not use pretainded model!!!")
+           pass
     
     def forward(self, x):
         # preprocess image
-        #print(f"{__name__} shape: {x.shape}")
+        # torch.Tensor' shape: torch.Size([1, channel, h, w])
         x = (x - self.default_mean.to(x)) / self.default_std.to(x)
+        # clip_model: pyiqa.archs.clip_model.CLIP
         clip_model = self.clip_model[0].to(x)
-        #print(f"{__name__} clip_model: {type(clip_model)}")
 
         if self.model_type == 'clipiqa':
             prompts = self.prompt_pairs.to(x.device)

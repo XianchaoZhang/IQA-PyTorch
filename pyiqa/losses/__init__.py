@@ -20,10 +20,8 @@ def build_loss(opt):
     """
     opt = deepcopy(opt)
     if debug:
-        print(f"{__name__} opt")
-        for k, v in opt.items():
-            print(f"\t{k}: {v}")
-        #exit(0)
+        print(f"{__name__} type {opt['type']}")
+
     loss_type = opt.pop('type')
     loss = LOSS_REGISTRY.get(loss_type)(**opt)
     logger = get_root_logger()

@@ -9,6 +9,7 @@ from pyiqa.models import lr_scheduler as lr_scheduler
 from pyiqa.utils import get_root_logger
 from pyiqa.utils.dist_util import master_only
 
+debug = 1
 
 class BaseModel():
     """Base model."""
@@ -308,8 +309,10 @@ class BaseModel():
                 Default: 'params'.
         """
         logger = get_root_logger()
+        # net: PromptLearner
         net = self.get_bare_model(net)
         load_net = torch.load(load_path, map_location=lambda storage, loc: storage)
+        if 0: print(f"{__name__} {load_net}")
         if param_key is not None:
             if param_key not in load_net and 'params' in load_net:
                 param_key = 'params'

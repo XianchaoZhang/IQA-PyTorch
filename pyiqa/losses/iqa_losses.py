@@ -9,6 +9,7 @@ from .loss_util import weighted_loss
 
 _reduction_modes = ['none', 'mean', 'sum']
 
+debug = 1
 
 @weighted_loss
 def emd_loss(pred, target, r=2):
@@ -66,6 +67,9 @@ class PLCCLoss(nn.Module):
 
     def __init__(self, loss_weight=1.0):
         super(PLCCLoss, self).__init__()
+
+        if debug: print(f"{__name__} loss_weight {loss_weight}")
+
         self.loss_weight = loss_weight
 
     def forward(self, pred, target):

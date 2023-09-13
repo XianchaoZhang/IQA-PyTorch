@@ -19,13 +19,19 @@ class GeneralIQAModel(BaseModel):
     def __init__(self, opt):
         super(GeneralIQAModel, self).__init__(opt)
 
+        if debug:
+            print(f"{__name__} self.net\n\
+                network {opt['network']}\n\
+                pretain_network {opt['path'].get('pretrain_network_g', None)}\n\
+                is_train {self.is_train}")
+
         # define network
         self.net = build_network(opt['network'])
         self.net = self.model_to_device(self.net)
         self.print_network(self.net)
 
         # load pretrained models
-        load_path = self.opt['path'].get('pretrain_network', None)
+        load_path = self.opt['path'].get('pretrain_network_g', None)
         if load_path is not None:
             param_key = self.opt['path'].get('param_key_g', 'params')
             self.load_network(self.net, load_path, self.opt['path'].get('strict_load', True), param_key)
@@ -37,14 +43,20 @@ class GeneralIQAModel(BaseModel):
         self.net.train()
         train_opt = self.opt['train']
 
+        if debug: print(f"{__name__} self.net_best network {self.opt['network']}")
+
         self.net_best = build_network(self.opt['network']).to(self.device)
         self.print_network(self.net_best)
+
+        if debug: print(f"{__name__} mos_loss_opt {train_opt['mos_loss_opt']}")
 
         # define losses
         if train_opt.get('mos_loss_opt'):
             self.cri_mos = build_loss(train_opt['mos_loss_opt']).to(self.device)
         else:
             self.cri_mos = None
+
+        if debug: print(f"{__name__} metric_loss_opt {train_opt['metric_loss_opt']}")
 
         # define metric related loss, such as plcc loss
         if train_opt.get('metric_loss_opt'):
@@ -61,12 +73,10 @@ class GeneralIQAModel(BaseModel):
         optim_params = []
         if debug:
             print(f"{__name__} net.named_parameters")
-            logger = get_root_logger()
-            #logger.info(f"{__name__} net.named_parameters")
+
         for k, v in self.net.named_parameters():
-            if debug:
-                print(f"\t{k}: {v}")
-                #logger.info(f"\t{k}: {v}")
+            if debug: print(f"\t{k}: {v}")
+
             if v.requires_grad:
                 optim_params.append(v)
             else:

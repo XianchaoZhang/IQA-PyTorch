@@ -20,13 +20,12 @@ _arch_modules = [importlib.import_module(f'pyiqa.archs.{file_name}') for file_na
 
 def build_network(opt):
     opt = deepcopy(opt)
-    if debug:
-        print(f"{__name__} opt")
-        for k, v in opt.items():
-            print(f"\t{k}: {v}")
-        #exit(0)
+
+    if debug: print(f"{__name__} network_type {opt['type']}")
+
     network_type = opt.pop('type')
     net = ARCH_REGISTRY.get(network_type)(**opt)
     logger = get_root_logger()
     logger.info(f'Network [{net.__class__.__name__}] is created.')
+
     return net

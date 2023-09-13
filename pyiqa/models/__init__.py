@@ -26,12 +26,11 @@ def build_model(opt):
             model_type (str): Model type.
     """
     opt = deepcopy(opt)
-    if debug:
-        print(f"{__name__} opt")
-        for k, v in opt.items():
-            print(f"\t{k}: {v}")
-        #exit(0)
+
+    if debug: print(f"{__name__} model_type {opt['model_type']}")
+
     model = MODEL_REGISTRY.get(opt['model_type'])(opt)
     logger = get_root_logger()
     logger.info(f'Model [{model.__class__.__name__}] is created.')
+
     return model
