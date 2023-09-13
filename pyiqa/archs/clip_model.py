@@ -315,6 +315,26 @@ class ModifiedResNet(nn.Module):
             layers.append(Bottleneck(self._inplanes, planes))
 
         return nn.Sequential(*layers)
+    
+    def forward_features(self, x, return_token=False, pos_embedding=False):
+        def stem(x):
+            for conv, bn in [(self.conv1, self.bn1), (self.conv2, self.bn2), (self.conv3, self.bn3)]:
+                x = self.relu(bn(conv(x)))
+            x = self.avgpool(x)
+            return x
+        
+        x = x.type(self.conv1.weight.dtype)
+        x = stem(x)
+        feat_list = [x]
+        x = self.layer1(x)
+        feat_list += [x]
+        x = self.layer2(x)
+        feat_list += [x]
+        x = self.layer3(x)
+        feat_list += [x]
+        x = self.layer4(x)
+        feat_list += [x]
+        return feat_list
 
     def forward(self, x, return_token=False, pos_embedding=False):
         # 在这里我们将三个卷积层集成到一个函数中使用,每一层均为 conv->bn->rel

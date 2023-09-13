@@ -20,7 +20,8 @@ default_model_urls = {
     'live': 'https://github.com/chaofengc/IQA-PyTorch/releases/download/v0.1-weights/DBCNN_LIVE-97262bf4.pth',
     'livec': 'https://github.com/chaofengc/IQA-PyTorch/releases/download/v0.1-weights/DBCNN_LIVEC-83f6dad3.pth',
     'livem': 'https://github.com/chaofengc/IQA-PyTorch/releases/download/v0.1-weights/DBCNN_LIVEM-698474e3.pth',
-    'koniq': 'https://github.com/chaofengc/IQA-PyTorch/releases/download/v0.1-weights/DBCNN_KonIQ10k-254e8241.pth',
+    'koniq': 'https://github.com/chaofengc/IQA-PyTorch/releases/download/v0.1-weights/DBCNN_KonIQ10k-2de81c0a.pth',
+    'scnn': 'https://github.com/chaofengc/IQA-PyTorch/releases/download/v0.1-weights/DBCNN_scnn-7ea73d75.pth',
 }
 
 
@@ -117,8 +118,7 @@ class DBCNN(nn.Module):
         self.features1 = torchvision.models.vgg16(weights='IMAGENET1K_V1').features
         self.features1 = nn.Sequential(*list(self.features1.children())[:-1])
         scnn = SCNN(use_bn=use_bn)
-        if pretrained_scnn_path is not None:
-            load_pretrained_network(scnn, pretrained_scnn_path)
+        load_pretrained_network(scnn, default_model_urls['scnn'])
 
         self.features2 = scnn.features
 

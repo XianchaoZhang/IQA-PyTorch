@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .arch_util import dist_to_mos, load_pretrained_network
-from .arch_util import ExactPadding2d, excact_padding_2d
+from pyiqa.matlab_utils import ExactPadding2d, exact_padding_2d 
 from pyiqa.utils.registry import ARCH_REGISTRY
 from pyiqa.data.multiscale_trans_util import get_multiscale_patches
 
@@ -36,7 +36,7 @@ class StdConv(nn.Conv2d):
 
     def forward(self, x):
         # implement same padding
-        x = excact_padding_2d(x, self.kernel_size, self.stride, mode='same')
+        x = exact_padding_2d(x, self.kernel_size, self.stride, mode='same')
         weight = self.weight
         weight = weight - weight.mean((1, 2, 3), keepdim=True)
         weight = weight / (weight.std((1, 2, 3), keepdim=True) + 1e-5)
@@ -344,9 +344,11 @@ class MUSIQ(nn.Module):
             load_pretrained_network(self, pretrained_model_path, True)
 
     def forward(self, x, return_mos=True, return_dist=False):
+
         # normalize inputs to [-1, 1] as the official code
-        x = (x - 0.5) * 2
-        x = get_multiscale_patches(x, **self.data_preprocess_opts)
+        if not self.training:
+            x = (x - 0.5) * 2
+            x = get_multiscale_patches(x, **self.data_preprocess_opts)
 
         assert len(x.shape) in [3, 4]
         if len(x.shape) == 4:

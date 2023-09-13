@@ -12,8 +12,8 @@ def get_meta_info(seed=123):
     """Generate meta information and train/val/test splits for AVA dataset.
 
     The split follows:
-        - split index 1: official
-        - split index 2: https://github.com/BestiVictory/ILGnet
+        - split index 1: official, https://github.com/imfing/ava_downloader/blob/master/AVA_dataset/aesthetics_image_lists/generic_test.jpgl
+        - split index 2: https://github.com/BestiVictory/ILGnet/tree/local/data/AVA1
     """
     all_label_file = '../datasets/AVA_dataset/AVA.txt'
 
@@ -26,7 +26,7 @@ def get_meta_info(seed=123):
     ]
 
     official_test_list = [
-        x.strip().split()[0] + '.jpg' for x in open('../datasets/AVA_dataset/train_splits/official_test_challenges.txt')
+        x.strip().split()[0] + '.jpg' for x in open('../datasets/AVA_dataset/aesthetics_image_lists/generic_test.jpgl')
     ]
 
     save_meta_path = './datasets/meta_info/meta_info_AVADataset.csv'
